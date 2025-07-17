@@ -23,11 +23,11 @@ except ImportError:
     print("Text-to-speech not available. Install with: pip install pyttsx3")
 
 try:
-    from googletrans import Translator
+    from deep_translator import GoogleTranslator
     TRANSLATOR_AVAILABLE = True
 except ImportError:
     TRANSLATOR_AVAILABLE = False
-    print("Google Translator not available. Install with: pip install googletrans==4.0.0-rc1")
+    print("Deep Translator not available. Install with: pip install deep-translator")
 
 # Fallback translator using basic dictionary (limited functionality)
 class FallbackTranslator:
@@ -51,16 +51,37 @@ class FallbackTranslator:
         text_lower = text.lower().strip()
         if src in self.basic_translations and text_lower in self.basic_translations[src]:
             if dest in self.basic_translations[src][text_lower]:
-                class TranslationResult:
-                    def __init__(self, text):
-                        self.text = text
-                return TranslationResult(self.basic_translations[src][text_lower][dest])
+                return self.basic_translations[src][text_lower][dest]
         
         # If no translation found, return original text with a note
-        class TranslationResult:
-            def __init__(self, text):
-                self.text = text
-        return TranslationResult(f"[Translation not available] {text}")
+        return f"[Translation not available] {text}"
+
+# DeepTranslator wrapper to maintain compatibility
+class DeepTranslatorWrapper:
+    def __init__(self):
+        self.translator = None
+        
+    def translate(self, text, src='auto', dest='en'):
+        try:
+            # Create translator instance for this translation
+            translator = GoogleTranslator(source=src, target=dest)
+            translated_text = translator.translate(text)
+            
+            # Return object with .text attribute for compatibility
+            class TranslationResult:
+                def __init__(self, text):
+                    self.text = text
+                    
+            return TranslationResult(translated_text)
+            
+        except Exception as e:
+            print(f"Translation error: {e}")
+            # Return original text if translation fails
+            class TranslationResult:
+                def __init__(self, text):
+                    self.text = text
+                    
+            return TranslationResult(text)
 
 class LanguageTranslator:
     def __init__(self):
@@ -99,11 +120,11 @@ class LanguageTranslator:
             self.tts_engine = None
             
         if self.translator_available:
-            self.translator = Translator()
+            self.translator = DeepTranslatorWrapper()
         else:
             self.translator = FallbackTranslator()
         
-        # Language mappings
+        # Language mappings (updated for deep-translator compatibility)
         self.languages = {
             'English': 'en',
             'Spanish': 'es',
@@ -114,7 +135,7 @@ class LanguageTranslator:
             'Russian': 'ru',
             'Japanese': 'ja',
             'Korean': 'ko',
-            'Chinese (Simplified)': 'zh-cn',
+            'Chinese (Simplified)': 'zh',
             'Chinese (Traditional)': 'zh-tw',
             'Arabic': 'ar',
             'Hindi': 'hi',
@@ -164,7 +185,6 @@ class LanguageTranslator:
             'Albanian': 'sq',
             'Macedonian': 'mk',
             'Bosnian': 'bs',
-            'Montenegrin': 'me',
             'Afrikaans': 'af',
             'Zulu': 'zu',
             'Xhosa': 'xh',
@@ -172,7 +192,6 @@ class LanguageTranslator:
             'Hausa': 'ha',
             'Amharic': 'am',
             'Somali': 'so',
-            'Malagasy': 'mg',
             'Esperanto': 'eo',
             'Latin': 'la'
         }
@@ -205,7 +224,7 @@ class LanguageTranslator:
             missing_deps.append("Text-to-Speech (pip install pyttsx3)")
             
         if not self.translator_available:
-            missing_deps.append("Google Translator (pip install googletrans==4.0.0-rc1)")
+            missing_deps.append("Deep Translator (pip install deep-translator)")
             
         if missing_deps:
             deps_text = "\n".join(f"• {dep}" for dep in missing_deps)
@@ -455,7 +474,12 @@ class LanguageTranslator:
                 translation = self.translator.translate(text, src=source_lang, dest=target_lang)
             else:
                 # Use fallback translator
-                translation = self.translator.translate(text, src=source_lang, dest=target_lang)
+                translation_result = self.translator.translate(text, src=source_lang, dest=target_lang)
+                # Create compatible result object
+                class TranslationResult:
+                    def __init__(self, text):
+                        self.text = text
+                translation = TranslationResult(translation_result)
             
             # Display translation
             self.output_text.config(state='normal')
